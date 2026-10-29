@@ -1,0 +1,1221 @@
+@if (!auth.user()) {
+  <main class="login-page">
+    <section class="login-card">
+      <div class="brand login-brand">
+        <span class="brand-mark">n</span><span>nexo<span class="brand-light">shop</span></span>
+      </div>
+      <p class="eyebrow">TU TIENDA EN UN SOLO LUGAR</p>
+      <h1>{{ authMode() === 'login' ? 'Bienvenido de nuevo' : 'Crea tu cuenta' }}</h1>
+      <p class="muted">
+        {{
+          authMode() === 'login'
+            ? 'Inicia sesión para continuar.'
+            : 'Las nuevas cuentas se registran como clientes.'
+        }}
+      </p>
+      @if (auth.notice()) {
+        <p class="info-banner" role="status">{{ auth.notice() }}</p>
+      }
+      @if (authError()) {
+        <p class="error-banner" role="alert">{{ authError() }}</p>
+      }
+      <form class="login-form" #authForm="ngForm" (ngSubmit)="submitAuth()">
+        @if (authMode() === 'register') {
+          <label
+            >Nombre completo<input
+              name="fullName"
+              [(ngModel)]="registerName"
+              autocomplete="name"
+              maxlength="100"
+              required
+          /></label>
+        }
+        <label
+          >Correo electrónico<input
+            type="email"
+            name="email"
+            [(ngModel)]="loginEmail"
+            autocomplete="username"
+            maxlength="254"
+            email
+            required
+        /></label>
+        <label
+          >Contraseña<input
+            type="password"
+            name="password"
+            [(ngModel)]="loginPassword"
+            [autocomplete]="authMode() === 'login' ? 'current-password' : 'new-password'"
+            [minlength]="authMode() === 'register' ? 8 : 1"
+            [maxlength]="authMode() === 'register' ? 72 : 255"
+            required
+        /></label>
+        <button
+          class="button button-primary button-wide"
+          [disabled]="saving() || authForm.invalid"
+          type="submit"
+        >
+          {{
+            saving() ? 'Procesando…' : authMode() === 'login' ? 'Iniciar sesión' : 'Crear cuenta'
+          }}
+          <span>→</span>
+        </button>
+      </form>
+      <button
+        class="text-button login-back"
+        [disabled]="saving()"
+        type="button"
+        (click)="setAuthMode(authMode() === 'login' ? 'register' : 'login')"
+      >
+        {{
+          authMode() === 'login'
+            ? '¿No tienes cuenta? Regístrate'
+            : 'Ya tengo cuenta · Iniciar sesión'
+        }}
+      </button>
+      <p class="login-note">Autenticación por token · Los permisos los valida el servidor.</p>
+    </section>
+  </main>
+} @else {
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" (click)="$event.preventDefault(); setView('dashboard')"
+        ><span class="brand-mark">n</span><span>nexo<span class="brand-light">shop</span></span></a
+      >
+      <div class="store-switcher">
+        <div class="store-avatar">N</div>
+        <div class="store-copy">
+          <strong>Nexo Shop</strong
+          ><span>{{ auth.isAdmin() ? 'Administración' : 'Cuenta de cliente' }}</span>
+        </div>
+      </div>
+      <p class="nav-caption">MENÚ PRINCIPAL</p>
+      <nav class="navigation" aria-label="Navegación principal">
+        @for (item of visibleNavigation(); track item.id) {
+          <button
+            type="button"
+            class="nav-link"
+            [class.selected]="activeView() === item.id"
+            [attr.aria-current]="activeView() === item.id ? 'page' : null"
+            (click)="setView(item.id)"
+          >
+            <span class="nav-icon">{{ item.icon }}</span
+            ><span>{{ item.label }}</span>
+          </button>
+        }
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="profile-button">
+        <span class="avatar avatar-lilac">{{ initials(auth.user()!.fullName) }}</span
+        ><span class="profile-copy"
+          ><strong>{{ auth.user()!.fullName }}</strong
+          ><span>{{ auth.isAdmin() ? 'Administrador' : 'Cliente' }}</span></span
+        >
+      </div>
+    </aside>
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <span>Nexo Shop</span><span class="crumb-separator">/</span
+          ><strong>{{ viewLabel() }}</strong>
+        </div>
+        <div class="topbar-actions">
+          <span class="session-label">{{ auth.user()!.email }}</span
+          ><button type="button" class="button button-outline" (click)="logout()">
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+      <div class="page-content">
+        <section class="page-heading heading-with-action">
+          <div>
+            <p class="eyebrow">{{ currentDateLabel }}</p>
+            <h1>
+              {{
+                activeView() === 'dashboard' ? '¡Hola, ' + auth.user()!.fullName + '!' : viewLabel()
+              }}
+            </h1>
+            <p class="muted">
+              {{
+                auth.isAdmin()
+                  ? 'Gestiona tu tienda con información del servidor.'
+                  : 'Explora el catálogo y administra tus pedidos.'
+              }}
+            </p>
+          </div>
+          <div class="heading-actions">
+            @if (activeView() === 'products' && auth.isAdmin()) {
+              <button type="button" class="button button-primary" (click)="openProduct()">
+                ＋ Nuevo producto
+              </button>
+            }
+            @if (
+              activeView() === 'dashboard' ||
+              activeView() === 'orders' ||
+              activeView() === 'products'
+            ) {
+              <button type="button" class="button button-primary" (click)="openOrder()">
+                ＋ Crear pedido
+              </button>
+            }
+            <button
+              type="button"
+              class="button button-outline"
+              [disabled]="loading()"
+              (click)="loadView(currentPage()?.number ?? 0)"
+            >
+              Actualizar
+            </button>
+          </div>
+        </section>
+
+        @if (error()) {
+          <div class="error-banner" role="alert">
+            {{ error() }}
+            <button
+              class="text-button"
+              type="button"
+              (click)="loadView(currentPage()?.number ?? 0)"
+            >
+              Reintentar
+            </button>
+          </div>
+        }
+        @if (loading()) {
+          <div class="loading-state" role="status" aria-live="polite">Cargando información…</div>
+        }
+        @if (!loading() && !error()) {
+          @if (activeView() === 'dashboard') {
+            <section class="metric-grid order-metrics">
+              <article class="metric-card compact">
+                <span>{{ auth.isAdmin() ? 'Pedidos de la tienda' : 'Mis pedidos' }}</span
+                ><strong>{{ orderPage()?.totalElements ?? 0 }}</strong
+                ><small>Órdenes registradas</small>
+              </article>
+              <article class="metric-card compact">
+                <span>Total de pedidos completados recientes</span
+                ><strong>{{ formatCurrency(recentRevenue()) }}</strong
+                ><small
+                  >Solo los últimos {{ orderPage()?.numberOfElements ?? 0 }} pedidos; no es el total
+                  histórico</small
+                >
+              </article>
+              @if (auth.isAdmin()) {
+                <article class="metric-card compact">
+                  <span>Productos activos</span
+                  ><strong>{{ activeProductPage()?.totalElements ?? 0 }}</strong
+                  ><small>Disponibles en el catálogo</small>
+                </article>
+              }
+            </section>
+            @if (auth.isAdmin()) {
+              <section class="dashboard-grid">
+                <article class="panel report-card">
+                  <div class="panel-heading">
+                    <div>
+                      <h2>Productos más vendidos</h2>
+                      <p>Unidades en órdenes completadas · Top 5</p>
+                    </div>
+                    <button class="text-button" type="button" (click)="setView('reports')">
+                      Ver reportes →
+                    </button>
+                  </div>
+                  <div class="ranked-list">
+                    @for (product of topSelling(); track product.productId; let i = $index) {
+                      <div class="ranked-row">
+                        <span class="rank">{{ i + 1 }}</span
+                        ><span>{{ product.name }}</span
+                        ><strong>{{ product.unitsSold }} uds.</strong>
+                      </div>
+                    } @empty {
+                      <p class="muted">Todavía no hay ventas completadas.</p>
+                    }
+                  </div>
+                </article>
+                <article class="panel report-card">
+                  <div class="panel-heading">
+                    <div>
+                      <h2>Clientes frecuentes</h2>
+                      <p>Ordenados por pedidos completados · Top 5</p>
+                    </div>
+                    <button class="text-button" type="button" (click)="setView('customers')">
+                      Ver clientes →
+                    </button>
+                  </div>
+                  <div class="ranked-list">
+                    @for (customer of customers(); track customer.customerId; let i = $index) {
+                      <div class="ranked-row">
+                        <span class="rank">{{ i + 1 }}</span
+                        ><span>{{ customer.fullName }}</span
+                        ><strong>{{ customer.completedOrders }} pedidos</strong>
+                      </div>
+                    } @empty {
+                      <p class="muted">Todavía no hay clientes con pedidos completados.</p>
+                    }
+                  </div>
+                </article>
+              </section>
+            }
+          }
+
+          @if (activeView() === 'products') {
+            <section class="panel data-panel">
+              <form class="table-toolbar" (ngSubmit)="loadView()">
+                <div class="search-box">
+                  <span>⌕</span
+                  ><input
+                    type="search"
+                    name="query"
+                    aria-label="Buscar productos"
+                    [(ngModel)]="query"
+                    placeholder="Nombre, SKU o descripción"
+                  />
+                </div>
+                <input
+                  class="filter-input"
+                  name="category"
+                  aria-label="Categoría exacta"
+                  [(ngModel)]="category"
+                  placeholder="Categoría exacta"
+                />
+                @if (auth.isAdmin()) {
+                  <select
+                    name="active"
+                    aria-label="Estado del producto"
+                    [(ngModel)]="productActive"
+                  >
+                    <option value="true">Activos</option>
+                    <option value="false">Inactivos</option>
+                  </select>
+                }
+                <select name="sort" aria-label="Ordenar productos" [(ngModel)]="productSort">
+                  <option value="name,asc">Nombre A–Z</option>
+                  <option value="name,desc">Nombre Z–A</option>
+                  <option value="price,asc">Menor precio</option>
+                  <option value="price,desc">Mayor precio</option>
+                </select>
+                <button class="button button-outline" type="submit">Buscar</button>
+              </form>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>PRODUCTO</th>
+                      <th>SKU</th>
+                      <th>CATEGORÍA</th>
+                      <th>PRECIO</th>
+                      <th>STOCK</th>
+                      <th>ESTADO</th>
+                      @if (auth.isAdmin()) {
+                        <th>ACCIONES</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (product of productPage()?.content; track product.id) {
+                      <tr>
+                        <td>
+                          <div class="user-cell">
+                            <span class="product-thumb violet">{{ initials(product.name) }}</span
+                            ><span
+                              ><strong>{{ product.name }}</strong
+                              ><small class="product-description">{{
+                                product.description
+                              }}</small></span
+                            >
+                          </div>
+                        </td>
+                        <td>{{ product.sku }}</td>
+                        <td>{{ product.category }}</td>
+                        <td class="amount-cell">{{ formatCurrency(product.price) }}</td>
+                        <td [class.stock-low]="product.stock <= 10">{{ product.stock }}</td>
+                        <td>
+                          <span
+                            class="status-pill"
+                            [class.status-green]="product.active"
+                            [class.status-gray]="!product.active"
+                            >{{ product.active ? 'Activo' : 'Inactivo' }}</span
+                          >
+                        </td>
+                        @if (auth.isAdmin()) {
+                          <td>
+                            <div class="table-actions">
+                              <button
+                                type="button"
+                                class="text-button"
+                                (click)="openProduct(product)"
+                              >
+                                Editar</button
+                              ><button
+                                type="button"
+                                class="text-button danger-text"
+                                [disabled]="!product.active"
+                                (click)="confirmAction('product', product.id, product.name)"
+                              >
+                                Desactivar
+                              </button>
+                            </div>
+                          </td>
+                        }
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="7" class="empty-state">
+                          No hay productos con esos criterios.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (activeView() === 'inventory') {
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>Existencias por producto</h2>
+                  <p>Los ajustes requieren un motivo y no permiten inventario negativo.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>PRODUCTO</th>
+                      <th>SKU</th>
+                      <th>EXISTENCIAS</th>
+                      <th>ÚLTIMO CAMBIO</th>
+                      <th>ACCIÓN</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of inventoryPage()?.content; track item.productId) {
+                      <tr>
+                        <td>{{ item.productName }}</td>
+                        <td>{{ item.sku }}</td>
+                        <td [class.stock-low]="item.quantity <= 10">{{ item.quantity }}</td>
+                        <td class="muted-cell">{{ formatDate(item.updatedAt) }}</td>
+                        <td>
+                          <button class="text-button" type="button" (click)="openAdjustment(item)">
+                            Ajustar inventario
+                          </button>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-state">No hay inventario registrado.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (activeView() === 'dashboard' || activeView() === 'orders') {
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>
+                    {{
+                      activeView() === 'dashboard'
+                        ? 'Pedidos recientes'
+                        : auth.isAdmin()
+                          ? 'Todos los pedidos'
+                          : 'Mis pedidos'
+                    }}
+                  </h2>
+                  <p>Los totales y descuentos son calculados por el backend.</p>
+                </div>
+                @if (activeView() === 'dashboard') {
+                  <button class="text-button" type="button" (click)="setView('orders')">
+                    Ver todos →
+                  </button>
+                }
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>PEDIDO</th>
+                      <th>CUENTA</th>
+                      <th>FECHA</th>
+                      <th>DESCUENTO</th>
+                      <th>TOTAL</th>
+                      <th>ESTADO</th>
+                      <th>ACCIONES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (order of orderPage()?.content; track order.id) {
+                      <tr>
+                        <td class="order-id">
+                          #{{ order.id }}{{ order.randomOrder ? ' · Aleatorio' : '' }}
+                        </td>
+                        <td>{{ order.customerEmail }}</td>
+                        <td class="muted-cell">{{ formatDate(order.createdAt) }}</td>
+                        <td>{{ order.discountPercent }}%</td>
+                        <td class="amount-cell">{{ formatCurrency(order.total) }}</td>
+                        <td>
+                          <span
+                            class="status-pill"
+                            [class.status-green]="order.status === 'COMPLETED'"
+                            [class.status-gray]="order.status === 'CANCELLED'"
+                            >{{ order.status === 'COMPLETED' ? 'Completado' : 'Cancelado' }}</span
+                          >
+                        </td>
+                        <td>
+                          <div class="table-actions">
+                            <button
+                              class="text-button"
+                              type="button"
+                              (click)="openOrderDetail(order.id)"
+                            >
+                              Detalle
+                            </button>
+                            @if (order.status === 'COMPLETED') {
+                              <button
+                                class="text-button danger-text"
+                                type="button"
+                                (click)="confirmAction('order', order.id, 'Pedido #' + order.id)"
+                              >
+                                Cancelar
+                              </button>
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="7" class="empty-state">Todavía no hay pedidos registrados.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (activeView() === 'customers') {
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>Top 5 clientes frecuentes</h2>
+                  <p>Clasificación enviada por el backend según órdenes completadas.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>CLIENTE</th>
+                      <th>CORREO</th>
+                      <th>PEDIDOS COMPLETADOS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (customer of customers(); track customer.customerId) {
+                      <tr>
+                        <td>
+                          <div class="user-cell">
+                            <span class="avatar avatar-lilac">{{
+                              initials(customer.fullName)
+                            }}</span
+                            ><strong>{{ customer.fullName }}</strong>
+                          </div>
+                        </td>
+                        <td>{{ customer.email }}</td>
+                        <td>{{ customer.completedOrders }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="3" class="empty-state">
+                          Todavía no hay clientes en el reporte.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (activeView() === 'users') {
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>Usuarios registrados</h2>
+                  <p>
+                    Las cuentas nuevas se crean mediante el registro público. Desactivar conserva
+                    sus órdenes.
+                  </p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>USUARIO</th>
+                      <th>ROL</th>
+                      <th>ESTADO</th>
+                      <th>CREACIÓN</th>
+                      <th>ACCIONES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (user of userPage()?.content; track user.id) {
+                      <tr>
+                        <td>
+                          <div class="user-cell">
+                            <span class="avatar avatar-lilac">{{ initials(user.fullName) }}</span
+                            ><span
+                              ><strong>{{ user.fullName }}</strong
+                              ><small>{{ user.email }}</small></span
+                            >
+                          </div>
+                        </td>
+                        <td>{{ user.role === 'ADMIN' ? 'Administrador' : 'Cliente' }}</td>
+                        <td>
+                          <span
+                            class="status-pill"
+                            [class.status-green]="user.active"
+                            [class.status-gray]="!user.active"
+                            >{{ user.active ? 'Activo' : 'Inactivo' }}</span
+                          >
+                        </td>
+                        <td class="muted-cell">{{ formatDate(user.createdAt) }}</td>
+                        <td>
+                          <div class="table-actions">
+                            <button class="text-button" type="button" (click)="openUser(user)">
+                              Editar</button
+                            ><button
+                              class="text-button danger-text"
+                              type="button"
+                              [disabled]="!user.active"
+                              (click)="confirmAction('user', user.id, user.fullName)"
+                            >
+                              Desactivar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-state">No hay usuarios registrados.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (activeView() === 'reports') {
+            <section class="dashboard-grid">
+              <article class="panel report-card">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Top 5 productos más vendidos</h2>
+                    <p>Solo unidades en pedidos completados</p>
+                  </div>
+                </div>
+                <div class="ranked-list">
+                  @for (product of topSelling(); track product.productId; let i = $index) {
+                    <div class="ranked-row">
+                      <span class="rank">{{ i + 1 }}</span
+                      ><span>{{ product.name }} · {{ product.sku }}</span
+                      ><strong>{{ product.unitsSold }} uds.</strong>
+                    </div>
+                  } @empty {
+                    <p class="muted">Sin ventas completadas.</p>
+                  }
+                </div>
+              </article>
+              <article class="panel report-card">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Top 5 clientes frecuentes</h2>
+                    <p>Por órdenes completadas</p>
+                  </div>
+                </div>
+                <div class="ranked-list">
+                  @for (customer of customers(); track customer.customerId; let i = $index) {
+                    <div class="ranked-row">
+                      <span class="rank">{{ i + 1 }}</span
+                      ><span>{{ customer.fullName }}</span
+                      ><strong>{{ customer.completedOrders }} pedidos</strong>
+                    </div>
+                  } @empty {
+                    <p class="muted">Sin clientes en el reporte.</p>
+                  }
+                </div>
+              </article>
+            </section>
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>Productos activos · {{ activeProductPage()?.totalElements ?? 0 }}</h2>
+                  <p>Ordenados por nombre ascendente</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>PRODUCTO</th>
+                      <th>SKU</th>
+                      <th>CATEGORÍA</th>
+                      <th>PRECIO</th>
+                      <th>STOCK</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (product of activeProductPage()?.content; track product.id) {
+                      <tr>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.sku }}</td>
+                        <td>{{ product.category }}</td>
+                        <td>{{ formatCurrency(product.price) }}</td>
+                        <td>{{ product.stock }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-state">No hay productos activos.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <p class="info-banner">
+              El rango de promociones se configura en el backend. Este contrato no incluye un
+              endpoint para modificarlo. Los descuentos efectivos aparecen en el detalle de cada
+              pedido.
+            </p>
+          }
+
+          @if (activeView() === 'audit') {
+            <section class="panel data-panel">
+              <div class="panel-heading simple-heading">
+                <div>
+                  <h2>Registro de auditoría</h2>
+                  <p>Historial de operaciones · 50 registros por página</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>FECHA</th>
+                      <th>ACTOR</th>
+                      <th>ACCIÓN</th>
+                      <th>ENTIDAD</th>
+                      <th>DETALLES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (entry of auditPage()?.content; track entry.id) {
+                      <tr>
+                        <td class="muted-cell">{{ formatDate(entry.occurredAt) }}</td>
+                        <td>{{ entry.actorEmail }}</td>
+                        <td>{{ entry.action }}</td>
+                        <td>{{ entry.entityType }} #{{ entry.entityId }}</td>
+                        <td class="audit-details">{{ entry.details }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-state">No hay registros de auditoría.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          @if (currentPage(); as page) {
+            <div class="pagination">
+              <span
+                >{{ page.totalElements }} registros · Página
+                {{ page.totalPages ? page.number + 1 : 0 }} de {{ page.totalPages }}</span
+              >
+              <div>
+                <button
+                  type="button"
+                  class="button button-outline"
+                  [disabled]="page.first || page.number === 0"
+                  (click)="changePage(-1)"
+                >
+                  ← Anterior</button
+                ><button
+                  type="button"
+                  class="button button-outline"
+                  [disabled]="page.last || page.totalPages === 0"
+                  (click)="changePage(1)"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          }
+        }
+        <footer class="page-footer">
+          <span>Nexo Shop</span><span>Datos de la API · Fechas en tu zona horaria</span>
+        </footer>
+      </div>
+    </main>
+  </div>
+}
+
+@if (modal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <section
+      class="modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      (click)="$event.stopPropagation()"
+      (keydown.escape)="closeModal()"
+    >
+      <button
+        type="button"
+        class="modal-close"
+        aria-label="Cerrar"
+        [disabled]="saving()"
+        (click)="closeModal()"
+      >
+        ×
+      </button>
+      @if (modalError()) {
+        <p class="error-banner modal-error" role="alert">{{ modalError() }}</p>
+      }
+      @switch (modal()) {
+        @case ('product') {
+          <p class="eyebrow">CATÁLOGO</p>
+          <h2 id="modal-title">
+            {{ editingId() === null ? 'Nuevo producto' : 'Editar producto' }}
+          </h2>
+          <form class="modal-form" #productForm="ngForm" (ngSubmit)="saveProduct()">
+            <label
+              >Nombre<input name="name" [(ngModel)]="productDraft.name" maxlength="160" required
+            /></label>
+            <div class="form-row">
+              <label
+                >SKU<input
+                  name="sku"
+                  [(ngModel)]="productDraft.sku"
+                  maxlength="80"
+                  required /></label
+              ><label
+                >Categoría<input
+                  name="category"
+                  [(ngModel)]="productDraft.category"
+                  maxlength="100"
+                  required
+              /></label>
+            </div>
+            <label
+              >Descripción<textarea
+                name="description"
+                [(ngModel)]="productDraft.description"
+                maxlength="2000"
+                rows="3"
+              ></textarea>
+            </label>
+            <label
+              >Precio (COP)<input
+                name="price"
+                type="number"
+                min="0.01"
+                step="0.01"
+                [(ngModel)]="productDraft.price"
+                required
+            /></label>
+            @if (editingId() === null) {
+              <label
+                >Stock inicial<input
+                  name="stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  [(ngModel)]="productDraft.initialStock"
+                  required
+              /></label>
+            } @else {
+              <p class="info-banner">
+                El stock se modifica desde Inventario, no al editar el producto.
+              </p>
+            }
+            <label class="check-row"
+              ><input name="active" type="checkbox" [(ngModel)]="productDraft.active" /><span
+                >Producto activo</span
+              ></label
+            >
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="button button-outline"
+                [disabled]="saving()"
+                (click)="closeModal()"
+              >
+                Cancelar</button
+              ><button
+                class="button button-primary"
+                type="submit"
+                [disabled]="saving() || productForm.invalid"
+              >
+                {{ saving() ? 'Guardando…' : 'Guardar producto' }}
+              </button>
+            </div>
+          </form>
+        }
+        @case ('adjustment') {
+          <p class="eyebrow">INVENTARIO</p>
+          <h2 id="modal-title">Ajustar existencias</h2>
+          <p class="muted">
+            {{ selectedInventory()?.productName }} · Stock: {{ selectedInventory()?.quantity }}
+          </p>
+          <form class="modal-form" #adjustmentForm="ngForm" (ngSubmit)="saveAdjustment()">
+            <label
+              >Unidades a sumar o restar<input
+                name="delta"
+                type="number"
+                step="1"
+                [(ngModel)]="adjustmentDelta"
+                required /></label
+            ><label
+              >Motivo<textarea
+                name="reason"
+                [(ngModel)]="adjustmentReason"
+                maxlength="500"
+                rows="3"
+                required
+              ></textarea>
+            </label>
+            <div class="modal-actions">
+              <button
+                class="button button-outline"
+                type="button"
+                [disabled]="saving()"
+                (click)="closeModal()"
+              >
+                Cancelar</button
+              ><button
+                class="button button-primary"
+                type="submit"
+                [disabled]="saving() || adjustmentForm.invalid"
+              >
+                {{ saving() ? 'Guardando…' : 'Aplicar ajuste' }}
+              </button>
+            </div>
+          </form>
+        }
+        @case ('user') {
+          <p class="eyebrow">USUARIOS</p>
+          <h2 id="modal-title">Editar usuario</h2>
+          <form class="modal-form" #userForm="ngForm" (ngSubmit)="saveUser()">
+            <label
+              >Nombre completo<input
+                name="fullName"
+                [(ngModel)]="userDraft.fullName"
+                maxlength="100"
+                required /></label
+            ><label
+              >Rol<select name="role" [(ngModel)]="userDraft.role">
+                <option value="CUSTOMER">Cliente</option>
+                <option value="ADMIN">Administrador</option>
+              </select></label
+            ><label
+              >Nueva contraseña (opcional)<input
+                name="password"
+                type="password"
+                [(ngModel)]="userDraft.password"
+                autocomplete="new-password"
+                minlength="8"
+                maxlength="72"
+                placeholder="Vacío para conservar la contraseña" /></label
+            ><label class="check-row"
+              ><input name="active" type="checkbox" [(ngModel)]="userDraft.active" /><span
+                >Cuenta activa</span
+              ></label
+            >
+            <p class="info-banner">
+              Cambiar tu propio rol o desactivar tu cuenta puede cerrar el acceso administrativo.
+            </p>
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="button button-outline"
+                [disabled]="saving()"
+                (click)="closeModal()"
+              >
+                Cancelar</button
+              ><button
+                type="submit"
+                class="button button-primary"
+                [disabled]="saving() || userForm.invalid"
+              >
+                {{ saving() ? 'Guardando…' : 'Guardar usuario' }}
+              </button>
+            </div>
+          </form>
+        }
+        @case ('order') {
+          <p class="eyebrow">NUEVA COMPRA</p>
+          <h2 id="modal-title">Crear pedido</h2>
+          <p class="muted">
+            Se registrará para {{ auth.user()?.email }}. El servidor calcula los descuentos y
+            verifica el stock.
+          </p>
+          <form class="modal-form" #orderForm="ngForm" (ngSubmit)="saveOrder()">
+            <label class="check-row"
+              ><input type="checkbox" name="random" [(ngModel)]="randomOrder" /><span
+                ><strong>Pedido aleatorio</strong
+                ><small>El backend selecciona productos distintos con stock.</small></span
+              ></label
+            >
+            @if (randomOrder) {
+              <label
+                >Cantidad de productos distintos (1 a 10)<input
+                  name="productCount"
+                  type="number"
+                  min="1"
+                  max="10"
+                  step="1"
+                  [(ngModel)]="randomProductCount"
+                  required
+              /></label>
+            } @else {
+              <div class="picker-search">
+                <input
+                  name="pickerQuery"
+                  aria-label="Buscar producto para pedido"
+                  [(ngModel)]="pickerQuery"
+                  placeholder="Buscar nombre, SKU o descripción"
+                /><button
+                  class="button button-outline"
+                  type="button"
+                  [disabled]="modalLoading()"
+                  (click)="loadPicker()"
+                >
+                  Buscar
+                </button>
+              </div>
+              @if (modalLoading()) {
+                <p role="status" class="muted">Cargando catálogo…</p>
+              }
+              @if (!modalLoading() && pickerPage(); as page) {
+                <label
+                  >Producto<select name="productId" [(ngModel)]="pickerProductId">
+                    <option [ngValue]="null">Selecciona un producto</option>
+                    @for (product of page.content; track product.id) {
+                      <option [ngValue]="product.id" [disabled]="product.stock === 0">
+                        {{ product.name }} · {{ formatCurrency(product.price) }} ·
+                        {{ product.stock }} disponibles
+                      </option>
+                    }
+                  </select></label
+                >
+                @if (!page.content.length) {
+                  <p class="muted">No hay productos con esos criterios.</p>
+                }
+                <div class="picker-pagination">
+                  <button
+                    class="text-button"
+                    type="button"
+                    [disabled]="page.first"
+                    (click)="loadPicker(page.number - 1)"
+                  >
+                    ← Anterior</button
+                  ><span
+                    >{{ page.totalElements }} productos ·
+                    {{ page.totalPages ? page.number + 1 : 0 }}/{{ page.totalPages }}</span
+                  ><button
+                    class="text-button"
+                    type="button"
+                    [disabled]="page.last"
+                    (click)="loadPicker(page.number + 1)"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+                <div class="form-row">
+                  <label
+                    >Cantidad<input
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      step="1"
+                      [(ngModel)]="pickerQuantity" /></label
+                  ><button
+                    class="button button-outline add-item-button"
+                    type="button"
+                    [disabled]="pickerProductId === null"
+                    (click)="addOrderItem()"
+                  >
+                    ＋ Agregar producto
+                  </button>
+                </div>
+              }
+              <div class="cart-items">
+                @for (item of orderItems(); track item.productId) {
+                  <div>
+                    <span>{{ item.name }} × {{ item.quantity }}</span
+                    ><button
+                      class="text-button danger-text"
+                      type="button"
+                      aria-label="Quitar producto"
+                      (click)="removeOrderItem(item.productId)"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                } @empty {
+                  <p class="muted">Aún no has agregado productos.</p>
+                }
+              </div>
+            }
+            <p class="info-banner">
+              Los descuentos dependen de la fecha de registro y de las reglas del backend. El total
+              final se mostrará al registrar el pedido.
+            </p>
+            <div class="modal-actions">
+              <button
+                class="button button-outline"
+                type="button"
+                [disabled]="saving()"
+                (click)="closeModal()"
+              >
+                Cancelar</button
+              ><button
+                class="button button-primary"
+                type="submit"
+                [disabled]="saving() || orderForm.invalid"
+              >
+                {{ saving() ? 'Registrando…' : 'Registrar pedido' }}
+              </button>
+            </div>
+          </form>
+        }
+        @case ('detail') {
+          <p class="eyebrow">ORDEN</p>
+          <h2 id="modal-title">Detalle del pedido</h2>
+          @if (modalLoading()) {
+            <p role="status">Cargando pedido…</p>
+          }
+          @if (selectedOrder(); as order) {
+            <dl class="order-summary">
+              <div>
+                <dt>Pedido</dt>
+                <dd>#{{ order.id }}</dd>
+              </div>
+              <div>
+                <dt>Cuenta</dt>
+                <dd>{{ order.customerEmail }}</dd>
+              </div>
+              <div>
+                <dt>Fecha</dt>
+                <dd>{{ formatDate(order.createdAt) }}</dd>
+              </div>
+              <div>
+                <dt>Estado</dt>
+                <dd>{{ order.status === 'COMPLETED' ? 'Completado' : 'Cancelado' }}</dd>
+              </div>
+              <div>
+                <dt>Tipo</dt>
+                <dd>{{ order.randomOrder ? 'Aleatorio' : 'Normal' }}</dd>
+              </div>
+            </dl>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>PRODUCTO</th>
+                    <th>CANT.</th>
+                    <th>UNITARIO</th>
+                    <th>IMPORTE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of order.items; track item.productId) {
+                    <tr>
+                      <td>
+                        {{ item.productName
+                        }}<small class="detail-sku">{{ item.productSku }}</small>
+                      </td>
+                      <td>{{ item.quantity }}</td>
+                      <td>{{ formatCurrency(item.unitPrice) }}</td>
+                      <td>{{ formatCurrency(item.lineTotal) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <dl class="order-summary totals">
+              <div>
+                <dt>Subtotal</dt>
+                <dd>{{ formatCurrency(order.subtotal) }}</dd>
+              </div>
+              <div>
+                <dt>Descuento aplicado</dt>
+                <dd>{{ order.discountPercent }}%</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd>
+                  <strong>{{ formatCurrency(order.total) }}</strong>
+                </dd>
+              </div>
+            </dl>
+            @if (order.status === 'COMPLETED') {
+              <button
+                class="button button-outline danger-text"
+                type="button"
+                [disabled]="saving()"
+                (click)="confirmAction('order', order.id, 'Pedido #' + order.id)"
+              >
+                Cancelar pedido y reintegrar stock
+              </button>
+            }
+          }
+        }
+        @case ('confirm') {
+          <p class="eyebrow">CONFIRMAR OPERACIÓN</p>
+          <h2 id="modal-title">
+            {{ confirmation()?.kind === 'order' ? 'Cancelar pedido' : 'Desactivar recurso' }}
+          </h2>
+          <p class="confirmation-copy">{{ confirmation()?.label }}</p>
+          <p class="muted">
+            {{
+              confirmation()?.kind === 'order'
+                ? 'La orden quedará cancelada y el servidor reintegrará las existencias.'
+                : 'El recurso se desactivará. El historial y los datos asociados se conservan.'
+            }}
+          </p>
+          <div class="modal-actions">
+            <button
+              class="button button-outline"
+              type="button"
+              [disabled]="saving()"
+              (click)="closeModal()"
+            >
+              Volver</button
+            ><button
+              class="button button-primary"
+              type="button"
+              [disabled]="saving()"
+              (click)="executeConfirmation()"
+            >
+              {{ saving() ? 'Procesando…' : 'Confirmar' }}
+            </button>
+          </div>
+        }
+      }
+    </section>
+  </div>
+}
+@if (toast()) {
+  <div class="toast-message" role="status"><span>✓</span>{{ toast() }}</div>
+}
