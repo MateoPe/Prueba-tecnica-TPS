@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tps}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tps}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deploy-32chars}
+      APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-admin@tps.local}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-Admin123456!}
+      DISCOUNT_START: ${DISCOUNT_START:-}
+      DISCOUNT_END: ${DISCOUNT_END:-}
+      DISCOUNT_STANDARD_PERCENT: ${DISCOUNT_STANDARD_PERCENT:-10}
+      DISCOUNT_RANDOM_PERCENT: ${DISCOUNT_RANDOM_PERCENT:-50}
+      FREQUENT_DISCOUNT_PERCENT: ${FREQUENT_DISCOUNT_PERCENT:-5}
+      FREQUENT_ORDER_THRESHOLD: ${FREQUENT_ORDER_THRESHOLD:-5}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  postgres_data:
